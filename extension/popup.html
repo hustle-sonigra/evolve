@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prompt Refine</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">PROMPT REFINE</p>
+      <h1>Optimization mode</h1>
+      <label for="mode">Choose a mode for Alt+Shift+P</label>
+      <select id="mode" name="mode">
+        <option value="BASIC">Basic</option>
+        <option value="LEARNING">Learning</option>
+        <option value="CODING">Coding</option>
+        <option value="WRITING">Writing</option>
+      </select>
+      <p id="status" role="status" aria-live="polite">Saved on this browser.</p>
+      <button id="connect" type="button">Connect to local API</button>
+      <p id="api-status" role="status" aria-live="polite">Needed to optimize prompts on this browser.</p>
+      <p class="hint">Focus a supported site's prompt editor, then press Alt+Shift+P.</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
