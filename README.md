@@ -1,6 +1,6 @@
-# Prompt Refine
+# evolve (PromptRefine)
 
-Small React + Express application for improving a draft prompt before the user sends it to a chat.
+PromptRefine helps AI users turn rough ideas into effective prompts using customizable refinement modes and a simple keyboard shortcut. Refine prompts where you write them, avoid repetitive copy-paste, and improve your AI workflow without switching tabs.
 
 ## Requirements
 
