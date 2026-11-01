@@ -41,7 +41,7 @@ export async function optimizePrompt(prompt, mode = "BASIC") {
     model: process.env.GROQ_MODEL ?? "openai/gpt-oss-20b",
     temperature: 0.3,
     messages: [
-      { role: "system", content: `${COMMON_INSTRUCTIONS}/n/n mode:${optimizerInstructions}` },
+      { role: "system", content: `${COMMON_INSTRUCTIONS} \n\n mode:${optimizerInstructions}` },
       { role: "user", content: prompt },
     ],
   });

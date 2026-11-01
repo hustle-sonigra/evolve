@@ -1,16 +1,16 @@
 # Prompt Refine browser extension (Chrome / Chromium)
 
-This Manifest V3 extension adds **Alt+Shift+P** on Gemini, Claude, Write-box, and ChatGPT. Choose Basic, Learning, Coding, or Writing from the Prompt Refine toolbar popup. The choice is saved in this browser and sent with the focused editor's draft to the local Express API. The optimized prompt replaces the draft; the extension does not submit it.
+This Manifest V3 extension adds **Alt+Shift+P** on Gemini, Claude, Write-box, and ChatGPT. Choose Basic, Learning, Coding, or Writing from the Prompt Refine toolbar popup. The selected mode and Groq API key are stored in this browser. The extension sends the focused editor's draft and the saved key directly to Groq; the optimized prompt replaces the draft and is not submitted to the chat.
 
 ## Load it in Chrome
 
-1. Set `EXTENSION_ORIGIN` in `server/.env` to the extension's origin (`chrome-extension://<extension-id>`), then start the app and API from the repository root with `npm run dev`. Keep that terminal running; the extension sends requests to `http://localhost:3001`.
+1. Get a Groq API key from your Groq account. This extension sends optimization requests directly to Groq using your key; it does not use the local Express API.
 2. Open `chrome://extensions`.
 3. Turn on **Developer mode**, choose **Load unpacked**, and select this `extension` folder.
-4. Open or reload a supported site. Click the Prompt Refine extension icon, select a mode, then click **Connect to local API**. If Chrome prompts for loopback access, allow it.
+4. Open or reload a supported site. Click the Prompt Refine extension icon, paste and save your Groq key, then use **Test key** to verify it. Choose an optimization mode in the same popup.
 5. Focus the prompt editor, enter text, and press **Alt+Shift+P**. The confirmation toast shows which mode was used.
 
-The manifest grants page access only to the supported sites and `127.0.0.1:3001`, plus local extension storage for the mode preference. If the API is deployed elsewhere, update the API URL and host permission in the extension files.
+The manifest grants page access only to the supported sites and Groq's API, plus local extension storage for the mode preference and Groq key. The key remains in the browser profile and is sent to Groq with each optimization request.
 
 ## How text detection stays resilient
 

@@ -1,4 +1,18 @@
-const API_URL = "http://localhost:3001/api/optimize";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "openai/gpt-oss-20b";
+const COMMON_INSTRUCTIONS = `
+Improve the draft prompt while preserving its intent, facts, constraints,
+and desired outcome. Enhance clarity and structure without inventing details.
+Make reasonable assumptions when information is missing. If the prompt is
+too vague to interpret confidently, return exactly: "Please provide a clearer prompt."
+Return only the improved prompt, without commentary or explanation.
+`;
+const MODE_INSTRUCTIONS = Object.freeze({
+  BASIC: `Focus on general clarity, concise wording, logical structure, and flow.`,
+  LEARNING: `Focus on learning and understanding. Where relevant, clarify the topic and learning level, and include simple explanations, step-by-step guidance, examples, or analogies where useful.`,
+  CODING: `Focus on programming and software development. Where relevant, clarify the language, framework, environment, expected behavior, inputs, outputs, and constraints. Do not invent technical requirements.`,
+  WRITING: `Focus on writing and content creation. Where relevant, clarify the audience, purpose, tone, style, format, and length while preserving the author's intended meaning and voice.`,
+});
 const ALLOWED_HOSTS = new Set([
   "gemini.google.com",
   "claude.ai",
@@ -30,24 +44,52 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   (async () => {
-    const { optimizationMode = "BASIC" } = await chrome.storage.local.get("optimizationMode");
+    const {
+      optimizationMode = "BASIC",
+      groqApiKey = "",
+    } = await chrome.storage.local.get(["optimizationMode", "groqApiKey"]);
     const mode = ALLOWED_MODES.has(optimizationMode) ? optimizationMode : "BASIC";
-    const response = await fetch(API_URL, {
+    if (!groqApiKey) throw new Error("Add your Groq API key in the Prompt Refine popup first.");
+
+    const response = await fetch(GROQ_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: message.prompt, mode }),
-      targetAddressSpace: "loopback",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${groqApiKey}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: `${COMMON_INSTRUCTIONS}\n\n${MODE_INSTRUCTIONS[mode]}`,
+          },
+          { role: "user", content: message.prompt },
+        ],
+        temperature: 0.3,
+      }),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error ?? "Optimization failed.");
-    sendResponse({ optimizedPrompt: result.optimizedPrompt, mode });
+    if (!response.ok) {
+      const providerMessage = result.error?.message ?? result.error;
+      if (response.status === 401 || response.status === 403) {
+        throw new Error("Groq rejected the API key. Check or replace it in the extension popup.");
+      }
+      if (response.status === 429) {
+        throw new Error("Groq rate limit reached. Wait a while or check your Groq plan limits.");
+      }
+      throw new Error(typeof providerMessage === "string" ? providerMessage : "Groq optimization failed.");
+    }
+    const optimizedPrompt = result.choices?.[0]?.message?.content?.trim();
+    if (!optimizedPrompt) throw new Error("Groq returned an empty prompt.");
+    sendResponse({ optimizedPrompt, mode });
   })().catch((error) => {
     const message = error instanceof TypeError
-      ? "Could not reach the Prompt Refine API. Start the app with `npm run dev` and try again."
-      : error.message ?? "Could not reach the Prompt Refine API.";
+      ? "Could not reach Groq. Check your internet connection and try again."
+      : error.message ?? "Prompt optimization failed.";
     sendResponse({ error: message });
   });
 
-  // Keep the message channel open so the service worker can reply after fetch completes.
+  // Keep the message channel open while the Groq request is in flight.
   return true;
 });

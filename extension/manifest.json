@@ -8,7 +8,7 @@
     "https://gemini.google.com/*",
     "https://claude.ai/*",
     "https://write-box.appspot.com/*",
-    "http://localhost:3001/*",
+    "https://api.groq.com/*",
     "https://chatgpt.com/*"
   ],
   "background": {
