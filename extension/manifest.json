@@ -9,10 +9,12 @@
     "https://claude.ai/*",
     "https://write-box.appspot.com/*",
     "https://api.groq.com/*",
+    "http://localhost:3001/*",
     "https://chatgpt.com/*"
   ],
   "background": {
-    "service_worker": "service-worker.js"
+    "service_worker": "service-worker.js",
+    "type": "module"
   },
   "action": {
     "default_popup": "popup.html",

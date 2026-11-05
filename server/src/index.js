@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import { MODE_INSTRUCTIONS, optimizePrompt } from "./services/optimizer.js";
+import { saveTelemetryEvent } from "./telemetry-db.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -28,6 +29,94 @@ app.use(express.json({ limit: "32kb" }));
 
 app.get("/api/health", (_request, response) => {
   response.json({ status: "ok" });
+});
+
+const TELEMETRY_MODES = new Set(["BASIC", "LEARNING", "CODING", "WRITING"]);
+const TELEMETRY_STATUSES = new Set([
+  "success",
+  "network_error",
+  "provider_error",
+  "request_error",
+]);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const isOptionalText = (value, maxLength = 120) =>
+  value === null || value === undefined ||
+  (typeof value === "string" && value.length <= maxLength);
+const isOptionalCount = (value) =>
+  value === null || value === undefined ||
+  (Number.isInteger(value) && value >= 0);
+
+app.post("/api/telemetry/events", (request, response) => {
+  const event = request.body;
+  if (!event || typeof event !== "object" || Array.isArray(event)) {
+    return response.status(400).json({ error: "Provide one telemetry event object." });
+  }
+
+  const requiredValid =
+    UUID_PATTERN.test(event.event_id) &&
+    UUID_PATTERN.test(event.install_id) &&
+    UUID_PATTERN.test(event.session_id) &&
+    typeof event.timestamp === "string" && Number.isFinite(Date.parse(event.timestamp)) &&
+    TELEMETRY_MODES.has(event.mode) &&
+    typeof event.model === "string" && event.model.length > 0 && event.model.length <= 120 &&
+    Number.isInteger(event.prompt_chars) && event.prompt_chars >= 0 &&
+    typeof event.status === "string" && event.status.length <= 20 &&
+    (TELEMETRY_STATUSES.has(event.status) || /^http_[1-5]\d{2}$/.test(event.status)) &&
+    typeof event.region_consent === "boolean";
+
+  const optionalValid =
+    isOptionalText(event.platform, 80) &&
+    isOptionalText(event.topic, 100) &&
+    isOptionalText(event.subtopic, 100) &&
+    isOptionalCount(event.input_tokens) &&
+    isOptionalCount(event.output_tokens) &&
+    isOptionalCount(event.response_ms) &&
+    isOptionalCount(event.refinements) &&
+    isOptionalText(event.language, 35) &&
+    isOptionalText(event.region, 80) &&
+    isOptionalText(event.user_agent_family, 80) &&
+    isOptionalText(event.os, 80) &&
+    isOptionalText(event.architecture, 80);
+
+  if (!requiredValid || !optionalValid) {
+    return response.status(400).json({ error: "Telemetry event has invalid or missing fields." });
+  }
+
+  // Only save the defined schema. Prompts, API keys, and arbitrary client fields are dropped.
+  const safeEvent = {
+    event_id: event.event_id,
+    install_id: event.install_id,
+    session_id: event.session_id,
+    occurred_at: new Date(event.timestamp).toISOString(),
+    platform: event.platform ?? null,
+    mode: event.mode,
+    model: event.model,
+    topic: event.topic ?? null,
+    subtopic: event.subtopic ?? null,
+    prompt_chars: event.prompt_chars,
+    input_tokens: event.input_tokens ?? null,
+    output_tokens: event.output_tokens ?? null,
+    response_ms: event.response_ms ?? null,
+    status: event.status,
+    refinements: event.refinements ?? null,
+    language: event.language ?? null,
+    // `region` is the Groq processing region from x-groq-region, not user geolocation.
+    region: event.region ?? null,
+    region_consent: event.region_consent,
+    user_agent_family: event.user_agent_family ?? null,
+    os: event.os ?? null,
+    architecture: event.architecture ?? null,
+  };
+
+  try {
+    const inserted = saveTelemetryEvent(safeEvent);
+    return response.status(inserted ? 201 : 200).json({
+      accepted: true,
+      duplicate: !inserted,
+    });
+  } catch {
+    return response.status(500).json({ error: "Could not save telemetry event." });
+  }
 });
 
 app.post("/api/optimize", async (request, response) => {

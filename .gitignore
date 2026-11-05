@@ -3,4 +3,7 @@ client/node_modules/
 server/node_modules/
 client/dist/
 server/.env
+server/data/*.sqlite
+server/data/*.sqlite-shm
+server/data/*.sqlite-wal
 .env
