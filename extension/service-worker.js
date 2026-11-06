@@ -5,6 +5,58 @@ import {
 } from "./groq-config.js";
 import { getGroqErrorMessage, requestGroq } from "./groq-client.js";
 import { prepareTelemetry, recordTelemetry } from "./telemetry.js";
+import { ALLOWED_SITES_STORAGE_KEY, SITE_ORIGINS } from "./site-config.js";
+
+const CONTENT_SCRIPT_ID = "prompt-refine-selected-sites";
+let scriptSyncQueue = Promise.resolve();
+
+function queueSelectedSiteScriptSync() {
+  scriptSyncQueue = scriptSyncQueue.catch(() => {}).then(syncSelectedSiteScripts);
+  return scriptSyncQueue;
+}
+
+async function syncSelectedSiteScripts() {
+  const [{ [ALLOWED_SITES_STORAGE_KEY]: savedSites = [] }, granted] = await Promise.all([
+    chrome.storage.local.get(ALLOWED_SITES_STORAGE_KEY),
+    chrome.permissions.getAll(),
+  ]);
+  const grantedOrigins = new Set(granted.origins ?? []);
+  const matches = [...new Set(savedSites
+    .map((siteId) => SITE_ORIGINS[siteId])
+    .filter((origin) => origin && grantedOrigins.has(origin)))];
+
+  await chrome.scripting.unregisterContentScripts({ ids: [CONTENT_SCRIPT_ID] }).catch(() => {});
+  if (matches.length) {
+    await chrome.scripting.registerContentScripts([{
+      id: CONTENT_SCRIPT_ID,
+      matches,
+      js: ["content.js"],
+      runAt: "document_idle",
+    }]);
+  }
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  void queueSelectedSiteScriptSync().catch(console.error);
+});
+chrome.runtime.onStartup.addListener(() => {
+  void queueSelectedSiteScriptSync().catch(console.error);
+});
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "local" && changes[ALLOWED_SITES_STORAGE_KEY]) {
+    void queueSelectedSiteScriptSync().catch(console.error);
+  }
+});
+chrome.permissions.onRemoved.addListener(() => {
+  void queueSelectedSiteScriptSync().catch(console.error);
+});
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+  if (request?.type !== "SYNC_SELECTED_SITE_SCRIPTS") return;
+  void queueSelectedSiteScriptSync()
+    .then(() => sendResponse({ ok: true }))
+    .catch(() => sendResponse({ error: "Could not update site scripts." }));
+  return true;
+});
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request?.type !== "PROMPT_REFINE_OPTIMIZE") return;
@@ -20,7 +72,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return;
   }
 
-  void optimizePrompt(request.prompt)
+  void isSiteEnabled(senderHost)
+    .then((enabled) => {
+      if (!enabled) throw new Error("Enable this site in the Prompt Refine popup first.");
+      return optimizePrompt(request.prompt);
+    })
     .then(sendResponse)
     .catch((error) => {
       sendResponse({ error: getUserFacingError(error) });
@@ -29,6 +85,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Keep the message channel open while Groq responds.
   return true;
 });
+
+async function isSiteEnabled(host) {
+  const [{ [ALLOWED_SITES_STORAGE_KEY]: savedSites = [] }, granted] = await Promise.all([
+    chrome.storage.local.get(ALLOWED_SITES_STORAGE_KEY),
+    chrome.permissions.getAll(),
+  ]);
+  return savedSites.some((siteId) => {
+    const origin = SITE_ORIGINS[siteId];
+    return origin && new URL(origin.replace("/*", "/")).hostname === host &&
+      (granted.origins ?? []).includes(origin);
+  });
+}
 
 function getSenderHost(senderUrl) {
   try {

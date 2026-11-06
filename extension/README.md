@@ -10,7 +10,7 @@ This Manifest V3 extension adds **Alt+Shift+P** on Gemini, Claude, Write-box, an
 4. Open or reload a supported site. Click the Prompt Refine extension icon, paste and save your Groq key, then use **Test key** to verify it. Choose an optimization mode in the same popup.
 5. Focus the prompt editor, enter text, and press **Alt+Shift+P**. The confirmation toast shows which mode was used.
 
-The manifest grants page access only to the supported sites and Groq's API, plus local extension storage for the mode preference and Groq key. The key remains in the browser profile and is sent to Groq with each optimization request.
+The extension requests access to a selectable site only when its checkbox is enabled. Chrome asks the user to approve each site's optional permission. Enabled site IDs are stored locally and the service worker registers `content.js` only for granted sites; after enabling a site, refresh its tab to load the content script. Disabling a site removes its permission and unregisters it. The Groq API and local telemetry endpoint remain fixed host permissions. The Groq key remains in the browser profile and is sent to Groq with each optimization request.
 
 ## How text detection stays resilient
 

@@ -6,6 +6,8 @@ export const ALLOWED_HOSTS = new Set([
   "claude.ai",
   "write-box.appspot.com",
   "chatgpt.com",
+  "mail.google.com",
+  "app.slack.com",
 ]);
 
 export const ALLOWED_MODES = new Set(["BASIC", "LEARNING", "CODING", "WRITING"]);

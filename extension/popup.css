@@ -21,3 +21,55 @@ button:disabled { opacity: .65; cursor: wait; }
 #status { min-height: 20px; margin: 10px 0; color: #3c7452; font-size: 12px; }
 #key-status { min-height: 20px; margin: 8px 0 12px; color: #77778b; font-size: 11px; }
 .hint { margin: 0; color: #77778b; font-size: 11px; }
+fieldset { min-width: 0; margin: 0 0 8px; padding: 0; border: 0; }
+legend { margin-bottom: 8px; padding: 0; font-size: 12px; font-weight: 650; }
+
+.checkbox-group { display: grid; gap: 6px; }
+
+.check-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #d9d8e5;
+  border-radius: 8px;
+  background: white;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.check-option:hover { border-color: #b9b2ee; }
+.check-option:has(input:checked) { border-color: #6558c7; background: #f4f2ff; }
+.check-option:has(input:focus-visible) { outline: 2px solid #7165d8; outline-offset: 2px; }
+
+/* the checkbox itself */
+.check-option input {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  place-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid #c4c2d6;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.check-option input::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  margin-top: -2px;
+  border-left: 2px solid white;
+  border-bottom: 2px solid white;
+  transform: rotate(-45deg) scale(0);
+  transition: transform .12s;
+}
+.check-option input:checked { border-color: #6558c7; background: #6558c7; }
+.check-option input:checked::after { transform: rotate(-45deg) scale(1); }

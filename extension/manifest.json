@@ -3,14 +3,18 @@
   "name": "Prompt Refine",
   "version": "0.1.0",
   "description": "Optimize the focused draft in supported web editors.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "scripting"],
   "host_permissions": [
+    "https://api.groq.com/*",
+    "http://localhost:3001/*"
+  ],
+  "optional_host_permissions": [
     "https://gemini.google.com/*",
     "https://claude.ai/*",
     "https://write-box.appspot.com/*",
-    "https://api.groq.com/*",
-    "http://localhost:3001/*",
-    "https://chatgpt.com/*"
+    "https://chatgpt.com/*",
+    "https://mail.google.com/*",
+    "https://app.slack.com/*"
   ],
   "background": {
     "service_worker": "service-worker.js",
@@ -19,17 +23,5 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "Prompt Refine settings"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://gemini.google.com/*",
-        "https://claude.ai/*",
-        "https://write-box.appspot.com/*",
-        "https://chatgpt.com/*"
-      ],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ]
+  }
 } 

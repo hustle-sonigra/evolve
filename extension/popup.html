@@ -34,9 +34,20 @@
         <option value="CODING">Coding</option>
         <option value="WRITING">Writing</option>
       </select>
+  <fieldset>
+  <legend>Allowance</legend>
+  <div class="checkbox-group" id="allowance">
+    <label class="check-option"><input type="checkbox" name="allowance" value="chatGPT"> chatGPT</label>
+    <label class="check-option"><input type="checkbox" name="allowance" value="Claude"> Claude</label>
+    <label class="check-option"><input type="checkbox" name="allowance" value="Gemini"> Gemini</label>
+    <label class="check-option"><input type="checkbox" name="allowance" value="Gmail"> Gmail</label>
+    <label class="check-option"><input type="checkbox" name="allowance" value="Slackk"> Slack</label>
+    <label class="check-option"><input type="checkbox" name="allowance" value="writo"> Write-box</label>
+  </div>
+</fieldset>
       <p id="status" role="status" aria-live="polite">Saved on this browser.</p>
       <p class="hint">Focus a supported site's prompt editor, then press Alt+Shift+P.</p>
     </main>
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>
