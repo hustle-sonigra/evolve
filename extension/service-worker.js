@@ -1,10 +1,5 @@
-import {
-  ALLOWED_HOSTS,
-  ALLOWED_MODES,
-  GROQ_MODEL,
-} from "./groq-config.js";
+import { ALLOWED_HOSTS, ALLOWED_MODES } from "./groq-config.js";
 import { getGroqErrorMessage, requestGroq } from "./groq-client.js";
-import { prepareTelemetry, recordTelemetry } from "./telemetry.js";
 import { ALLOWED_SITES_STORAGE_KEY, SITE_ORIGINS } from "./site-config.js";
 
 const CONTENT_SCRIPT_ID = "prompt-refine-selected-sites";
@@ -114,67 +109,12 @@ async function optimizePrompt(prompt) {
     throw new Error("Add your Groq API key in the Prompt Refine popup first.");
   }
 
-  // Telemetry is optional and must not block a Groq optimization.
-  let telemetryContext = null;
-  try {
-    telemetryContext = await prepareTelemetry({ prompt, mode, model: GROQ_MODEL });
-  } catch {
-    telemetryContext = null;
-  }
+  const { response, result } = await requestGroq(prompt, mode, groqApiKey);
+  if (!response.ok) throw new Error(getGroqErrorMessage(response, result));
 
-  let telemetryRecorded = false;
-  let requestResult = null;
-
-  try {
-    requestResult = await requestGroq(prompt, mode, groqApiKey);
-    const { response, result } = requestResult;
-
-    if (!response.ok) {
-      telemetryRecorded = true;
-      void recordTelemetry(telemetryContext, {
-        status: `http_${response.status}`,
-        responseMs: requestResult.responseMs,
-        response,
-        result,
-      }).catch(() => {});
-
-      throw new Error(getGroqErrorMessage(response, result));
-    }
-
-    const optimizedPrompt = result.choices?.[0]?.message?.content?.trim();
-    if (!optimizedPrompt) {
-      telemetryRecorded = true;
-      void recordTelemetry(telemetryContext, {
-        status: "request_error",
-        responseMs: requestResult.responseMs,
-        response,
-        result,
-      }).catch(() => {});
-      throw new Error("Groq returned an empty prompt.");
-    }
-
-    telemetryRecorded = true;
-    void recordTelemetry(telemetryContext, {
-      status: "success",
-      responseMs: requestResult.responseMs,
-      response,
-      result,
-      successful: true,
-    }).catch(() => {});
-
-    return { optimizedPrompt, mode };
-  } catch (error) {
-    if (!telemetryRecorded) {
-      const status = error instanceof TypeError ? "network_error" : "request_error";
-      void recordTelemetry(telemetryContext, {
-        status,
-        responseMs: error.responseMs ?? requestResult?.responseMs ?? 0,
-        response: error.response ?? requestResult?.response ?? null,
-        result: error.result ?? requestResult?.result ?? null,
-      }).catch(() => {});
-    }
-    throw error;
-  }
+  const optimizedPrompt = result.choices?.[0]?.message?.content?.trim();
+  if (!optimizedPrompt) throw new Error("Groq returned an empty prompt.");
+  return { optimizedPrompt, mode };
 }
 
 function getUserFacingError(error) {

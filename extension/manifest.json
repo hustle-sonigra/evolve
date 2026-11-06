@@ -4,10 +4,7 @@
   "version": "0.1.0",
   "description": "Optimize the focused draft in supported web editors.",
   "permissions": ["storage", "scripting"],
-  "host_permissions": [
-    "https://api.groq.com/*",
-    "http://localhost:3001/*"
-  ],
+  "host_permissions": ["https://api.groq.com/*"],
   "optional_host_permissions": [
     "https://gemini.google.com/*",
     "https://claude.ai/*",
