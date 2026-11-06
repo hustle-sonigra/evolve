@@ -32,11 +32,12 @@ database.exec(`
     status TEXT NOT NULL,
     refinements INTEGER CHECK (refinements IS NULL OR refinements >= 0),
     language TEXT,
-    region TEXT,
     region_consent INTEGER NOT NULL DEFAULT 0 CHECK (region_consent IN (0, 1)),
     user_agent_family TEXT,
     os TEXT,
     architecture TEXT,
+    user_region TEXT,
+    groq_region TEXT,
     received_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
 
@@ -46,21 +47,41 @@ database.exec(`
     ON optimization_events (install_id, session_id, occurred_at);
 `);
 
+const existingColumns = new Set(
+  database.prepare("PRAGMA table_info(optimization_events)").all().map(({ name }) => name),
+);
+if (!existingColumns.has("user_region")) {
+  database.exec("ALTER TABLE optimization_events ADD COLUMN user_region TEXT");
+}
+if (!existingColumns.has("groq_region")) {
+  database.exec("ALTER TABLE optimization_events ADD COLUMN groq_region TEXT");
+}
+if (existingColumns.has("region")) {
+  database.exec(`
+    UPDATE optimization_events
+    SET groq_region = region
+    WHERE groq_region IS NULL AND region IS NOT NULL;
+    ALTER TABLE optimization_events DROP COLUMN region;
+  `);
+}
+
+
 const insertEvent = database.prepare(`
   INSERT INTO optimization_events (
     event_id, install_id, session_id, occurred_at, platform, mode, model,
     topic, subtopic, prompt_chars, input_tokens, output_tokens, response_ms,
-    status, refinements, language, region, region_consent,
-    user_agent_family, os, architecture
+    status, refinements, language, region_consent,
+    user_agent_family, os, architecture, user_region, groq_region
   ) VALUES (
     $event_id, $install_id, $session_id, $occurred_at, $platform, $mode, $model,
     $topic, $subtopic, $prompt_chars, $input_tokens, $output_tokens, $response_ms,
-    $status, $refinements, $language, $region, $region_consent,
-    $user_agent_family, $os, $architecture
+    $status, $refinements, $language, $region_consent,
+    $user_agent_family, $os, $architecture, $user_region, $groq_region
   ) ON CONFLICT(event_id) DO NOTHING
 `);
 
 export function saveTelemetryEvent(event) {
+   console.log("Received refinement telemetry:", event);
   const result = insertEvent.run({
     ...event,
     region_consent: event.region_consent ? 1 : 0,

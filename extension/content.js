@@ -119,7 +119,14 @@
     busy = true;
     showToast("Optimizing prompt...");
     try {
-      const response = await chrome.runtime.sendMessage({
+      const sendMessage = globalThis.chrome?.runtime?.sendMessage;
+      if (typeof sendMessage !== "function") {
+        throw new Error(
+          "Prompt Refine is no longer connected to this tab. Reload the extension, then refresh this page."
+        );
+      }
+
+      const response = await sendMessage.call(globalThis.chrome.runtime, {
         type: "PROMPT_REFINE_OPTIMIZE",
         prompt: original,
       });

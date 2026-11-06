@@ -86,7 +86,7 @@ export async function recordTelemetry(context, {
     response_ms: Math.max(0, Math.round(responseMs)),
     status,
     // This is Groq's processing region, not the user's geographic location.
-    region: response?.headers?.get("x-groq-region") ?? null,
+    groq_region: response?.headers?.get("x-groq-region") ?? null,
   };
 
   try {

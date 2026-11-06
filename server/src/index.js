@@ -46,7 +46,7 @@ const isOptionalCount = (value) =>
   value === null || value === undefined ||
   (Number.isInteger(value) && value >= 0);
 
-app.post("/api/telemetry/events", (request, response) => {
+app.post("/api/telemetry/events", async (request, response) => {
   const event = request.body;
   if (!event || typeof event !== "object" || Array.isArray(event)) {
     return response.status(400).json({ error: "Provide one telemetry event object." });
@@ -73,7 +73,7 @@ app.post("/api/telemetry/events", (request, response) => {
     isOptionalCount(event.response_ms) &&
     isOptionalCount(event.refinements) &&
     isOptionalText(event.language, 35) &&
-    isOptionalText(event.region, 80) &&
+    isOptionalText(event.groq_region, 80) &&
     isOptionalText(event.user_agent_family, 80) &&
     isOptionalText(event.os, 80) &&
     isOptionalText(event.architecture, 80);
@@ -100,8 +100,8 @@ app.post("/api/telemetry/events", (request, response) => {
     status: event.status,
     refinements: event.refinements ?? null,
     language: event.language ?? null,
-    // `region` is the Groq processing region from x-groq-region, not user geolocation.
-    region: event.region ?? null,
+    user_region: null,
+    groq_region: event.groq_region ?? null,
     region_consent: event.region_consent,
     user_agent_family: event.user_agent_family ?? null,
     os: event.os ?? null,
@@ -109,6 +109,8 @@ app.post("/api/telemetry/events", (request, response) => {
   };
 
   try {
+    const userRegion = await resolveUserRegion(request);
+    safeEvent.user_region = userRegion;
     const inserted = saveTelemetryEvent(safeEvent);
     return response.status(inserted ? 201 : 200).json({
       accepted: true,
@@ -118,6 +120,68 @@ app.post("/api/telemetry/events", (request, response) => {
     return response.status(500).json({ error: "Could not save telemetry event." });
   }
 });
+
+const regionCache = new Map();
+const REGION_CACHE_TTL_MS = 15 * 60 * 1000;
+const LOCAL_REGION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const isProduction = process.env.NODE_ENV === "production";
+
+async function resolveUserRegion(request) {
+  // Local requests arrive as loopback, so locate this machine's public egress IP.
+  // In production, look up the IP Express resolved for the incoming request.
+  const requestIp = request.ip?.replace(/^::ffff:/, "");
+  const isLoopback = !requestIp || ["127.0.0.1", "::1"].includes(requestIp);
+  if (!isLoopback && isProduction && !request.body.region_consent) {
+    console.warn("User-region lookup skipped: production request has no region consent.");
+    return null;
+  }
+
+  const cacheKey = isLoopback ? "local-egress" : requestIp;
+  const cached = regionCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.userRegion;
+
+  const fields = "success,city,region,country";
+  const url = isLoopback
+    ? `https://ipwho.is/?fields=${fields}`
+    : `https://ipwho.is/${encodeURIComponent(requestIp)}?fields=${fields}`;
+
+  try {
+    const result = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!result.ok) {
+      console.warn(`User-region lookup failed with HTTP ${result.status}.`);
+      return null;
+    }
+    const location = await result.json();
+    if (!location.success) {
+      console.warn("User-region lookup provider returned an error.");
+      return null;
+    }
+
+    const cityName = typeof location.city === "string" ? location.city.trim() : "";
+    const regionName = typeof location.region === "string" ? location.region.trim() : "";
+    const countryName = typeof location.country === "string"
+      ? location.country.trim()
+      : "";
+    const userRegion = [cityName || regionName, countryName]
+      .filter(Boolean)
+      .join(", ")
+      .slice(0, 120);
+    if (!userRegion) {
+      console.warn("User-region lookup returned no city, region, or country.");
+      return null;
+    }
+
+    regionCache.set(cacheKey, {
+      userRegion,
+      expiresAt: Date.now() + (isLoopback ? LOCAL_REGION_CACHE_TTL_MS : REGION_CACHE_TTL_MS),
+    });
+    return userRegion;
+  } catch (error) {
+    // Geo lookup is best-effort; telemetry should still be stored without a region.
+    console.warn("User-region lookup failed (network, timeout, or invalid response).");
+    return null;
+  }
+}
 
 app.post("/api/optimize", async (request, response) => {
   const prompt = request.body?.prompt;
